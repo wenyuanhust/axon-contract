@@ -14,6 +14,9 @@
 		"stddef.h": "c",
 		"secp256k1_helper.h": "c",
 		"secp256k1_lock.h": "c",
-		"secp256k1.c": "cpp"
+		"secp256k1.c": "cpp",
+		"secp256k1_data_info.h": "c",
+		"group.h": "c",
+		"ecmult_static_pre_context.h": "c"
 	}
 }

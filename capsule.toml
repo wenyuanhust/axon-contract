@@ -25,3 +25,11 @@ template_type = "Rust"
 [[contracts]]
 name = "stake"
 template_type = "Rust"
+
+[[contracts]]
+name = "cardano"
+template_type = "C"
+
+[[contracts]]
+name = "bitcoin"
+template_type = "C"

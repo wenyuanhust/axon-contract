@@ -13,3 +13,9 @@
 [submodule "contracts/common/blst/ckb-lib-secp256k1-blst/deps/blst"]
 	path = contracts/common/blst/ckb-lib-secp256k1-blst/deps/blst
 	url = https://github.com/cryptape/blst
+[submodule "contracts/c/deps/ed25519"]
+	path = contracts/c/deps/ed25519
+	url = https://github.com/nervosnetwork/ed25519.git
+[submodule "contracts/c/deps/secp256k1"]
+	path = contracts/c/deps/secp256k1
+	url = https://github.com/nervosnetwork/secp256k1

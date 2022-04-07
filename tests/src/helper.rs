@@ -11,6 +11,13 @@ use ckb_testtool::ckb_types::{
     prelude::*,
     H256,
 };
+use ckb_vm::{
+    machine::{
+        asm::{AsmCoreMachine, AsmMachine},
+        DefaultMachineBuilder, VERSION1,
+    },
+    ISA_IMC,
+};
 use molecule::prelude::*;
 use rand::prelude::*;
 
@@ -238,4 +245,12 @@ pub fn calc_withdrawal_lock_hash(
         .args(withdrawal_lock_args.as_slice().pack())
         .build()
         .calc_script_hash()
+}
+
+pub fn run_ckb_vm(code: &Bytes, args: &Vec<Bytes>) -> i8 {
+    let asm_core = AsmCoreMachine::new(ISA_IMC, VERSION1, u64::max_value());
+    let core = DefaultMachineBuilder::new(asm_core).build();
+    let mut machine = AsmMachine::new(core, None);
+    machine.load_program(&code, &args).unwrap();
+    machine.run().expect("run ckb-vm")
 }
