@@ -11,7 +11,6 @@ use ckb_testtool::ckb_types::{
 };
 use ckb_testtool::{builtin::ALWAYS_SUCCESS, context::Context};
 use ed25519_dalek::Signer;
-use secp256k1::{Secp256k1, Message, hashes::sha256};
 use helper::*;
 use molecule::prelude::*;
 use rlp::RlpStream;
@@ -628,35 +627,8 @@ fn test_cardano_success() {
     let signature = keypair.sign(&message).to_bytes().to_vec();
     let public_key = keypair.public.to_bytes().to_vec();
 
-    let cardano_bin: Bytes = Loader::default().load_binary("cardano");
+    let cardano_bin: Bytes = Loader::default().load_binary("ed25519");
     let args = vec![message.into(), signature.into(), public_key.into()];
     let result = run_ckb_vm(&cardano_bin, &args);
     assert!(result == 0, "result = {}", result);
-}
-
-#[test]
-fn test_bitcoin_success() {
-    let secp = Secp256k1::new();
-    let mut rng = secp256k1::rand::rngs::ThreadRng::default();
-    let (secret_key, public_key) = secp.generate_keypair(&mut rng);
-    let message = Message::from_hashed_data::<sha256::Hash>("Hello World!".as_bytes());
-    let signature = secp.sign_ecdsa_recoverable(&message, &secret_key);
-
-    let bitcoin_bin: Bytes = Loader::default().load_binary("bitcoin");
-    let secp256k1_data: Bytes = Loader::default().load_binary("secp256k1_data");
-    let args = {
-        let message = message.as_ref().to_vec();
-        let signature = {
-            let (recover_id, signature) = signature.serialize_compact();
-            let mut combine = signature.to_vec();
-            combine.push(recover_id.to_i32() as u8);
-            combine
-        };
-        let public_key = public_key.serialize().to_vec();
-        vec![message.into(), signature.into(), public_key.into(), secp256k1_data]
-    };
-    let result = run_ckb_vm(&bitcoin_bin, &args);
-    assert!(result == 0, "result = {}", result);
-    // let recover_public_key = secp.recover_ecdsa(&message, &signature).expect("recover");
-    // assert!(public_key == recover_public_key);
 }
