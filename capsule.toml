@@ -27,5 +27,5 @@ name = "stake"
 template_type = "Rust"
 
 [[contracts]]
-name = "ed25519"
+name = "cardano"
 template_type = "C"

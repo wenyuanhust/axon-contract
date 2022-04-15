@@ -1,7 +1,7 @@
 [[cells]]
-name = "withdrawal"
-enable_type_id = false
-location = { file = "build/release/withdrawal" }
+name = "ed25519"
+enable_type_id = true
+location = { file = "build/release/ed25519" }
 #
 # # reference to on-chain cells
 # [[cells]]

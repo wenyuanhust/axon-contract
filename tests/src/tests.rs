@@ -1,6 +1,8 @@
 use super::*;
 use bit_vec::BitVec;
 use blst::min_pk::AggregateSignature;
+use cardano_message_signing as MS;
+use cardano_serialization_lib as Cardano;
 use ckb_system_scripts::BUNDLED_CELL;
 use ckb_testtool::ckb_crypto::secp::Generator;
 use ckb_testtool::ckb_types::{
@@ -10,10 +12,10 @@ use ckb_testtool::ckb_types::{
     prelude::*,
 };
 use ckb_testtool::{builtin::ALWAYS_SUCCESS, context::Context};
-use ed25519_dalek::Signer;
 use helper::*;
 use molecule::prelude::*;
 use rlp::RlpStream;
+use MS::utils::ToBytes;
 
 const MAX_CYCLES: u64 = 100_000_000;
 
@@ -619,16 +621,55 @@ fn test_stake_success() {
     println!("consume cycles: {}", cycles);
 }
 
+// #[test]
+// fn test_cardano_success() {
+//     let mut csprng = rand::rngs::ThreadRng::default();
+//     let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
+//     let message = vec![0u8; 32];
+//     let signature = keypair.sign(&message).to_bytes().to_vec();
+//     let public_key = keypair.public.to_bytes().to_vec();
+
+//     let cardano_bin: Bytes = Loader::default().load_binary("ed25519");
+//     let args = vec![message.into(), signature.into(), public_key.into()];
+//     let result = run_ckb_vm(&cardano_bin, &args);
+//     assert!(result == 0, "result = {}", result);
+// }
+
 #[test]
 fn test_cardano_success() {
     let mut csprng = rand::rngs::ThreadRng::default();
     let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
-    let message = vec![0u8; 32];
-    let signature = keypair.sign(&message).to_bytes().to_vec();
-    let public_key = keypair.public.to_bytes().to_vec();
-
-    let cardano_bin: Bytes = Loader::default().load_binary("ed25519");
-    let args = vec![message.into(), signature.into(), public_key.into()];
+    let payload = vec![1u8; 32];
+    // generate Cardano singing key
+    let private_key =
+        Cardano::crypto::PrivateKey::from_normal_bytes(keypair.secret.to_bytes().as_ref()).unwrap();
+    let public_key = private_key.to_public();
+    let mut address = vec![2u8; 57];
+    // generate signing message
+    let mut protected_headers = MS::HeaderMap::new();
+    protected_headers.set_algorithm_id(&MS::Label::from_algorithm_id(
+        MS::builders::AlgorithmId::EdDSA,
+    ));
+    protected_headers
+        .set_header(
+            &MS::Label::new_text("address".into()),
+            &MS::cbor::CBORValue::new_bytes(address.clone()),
+        )
+        .unwrap();
+    let protected_serialized = MS::ProtectedHeaderMap::new(&protected_headers);
+    let unprotected = MS::HeaderMap::new();
+    let headers = MS::Headers::new(&protected_serialized, &unprotected);
+    let builder = MS::builders::COSESign1Builder::new(&headers, payload.clone(), false);
+    let message = builder.make_data_to_sign().to_bytes();
+    // generate signature
+    let signature = private_key.sign(message.as_slice());
+    // veriry by cardano self
+    assert!(public_key.verify(&message, &signature) == true);
+    // running ckv-vm
+    let cardano_bin: Bytes = Loader::default().load_binary("cardano");
+    let mut public_address = public_key.as_bytes().to_vec();
+    public_address.append(&mut address);
+    let args = vec![payload.into(), signature.to_bytes().into(), public_address.into()];
     let result = run_ckb_vm(&cardano_bin, &args);
     assert!(result == 0, "result = {}", result);
 }
