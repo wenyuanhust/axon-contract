@@ -16,6 +16,3 @@
 [submodule "contracts/c/deps/ed25519"]
 	path = contracts/c/deps/ed25519
 	url = https://github.com/nervosnetwork/ed25519.git
-[submodule "tests/cardano-lib"]
-	path = tests/cardano-lib
-	url = https://github.com/Emurgo/message-signing

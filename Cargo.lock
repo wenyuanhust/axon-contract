@@ -171,6 +171,7 @@ dependencies = [
 [[package]]
 name = "cardano-message-signing"
 version = "1.0.1"
+source = "git+https://github.com/ashuralyk/message-signing?branch=rust#b005f47f086d9f29efd8c93aa2b3c7b0eccf2aec"
 dependencies = [
  "base64-url",
  "byteorder",
