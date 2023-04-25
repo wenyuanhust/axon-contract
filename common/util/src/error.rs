@@ -12,12 +12,39 @@ pub enum Error {
     BadWitnessInputType = 10,
     BadWitnessLock,
     SignatureMismatch,
+    LockScriptEmpty,
     TypeScriptEmpty,
+    MismatchInputOutputAtAmount,
     ATCellShouldEmpty,
     BadScriptArgs,
+    UnknownMode,
 
     // selection contract
     OmniCheckpointCountError = 20,
+
+    // stake AT type script
+    StakeDataEmpty,
+    MissMatchSmtTypeId,
+    UpdateModeError,
+    BadSudtDataFormat,
+    BadInaugurationEpoch,
+    BadStakeChange,
+    RedeemExceedLimit,
+    BadStakeStakeChange,
+    BadStakeRedeemChange,
+    IllegalDefaultStakeInfo,
+    IllegalInputStakeInfo,
+    IllegalOutputStakeInfo,
+    BadRedeem,
+    BadElectionTime,
+    OldStakeInfosErr,
+    StaleStakeInfo,
+    NewStakeInfosErr,
+    BadInputStakeSmtCellCount,
+    BadOutputStakeSmtCellCount,
+
+    // checkpoint
+    CheckpointDataEmpty,
 }
 
 impl From<SysError> for Error {

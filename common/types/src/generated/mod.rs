@@ -1,12 +1,15 @@
 pub mod basic;
 pub mod basic_reader;
 pub mod checkpoint;
+pub mod checkpoint_reader;
 pub mod delegate;
 pub mod metadata;
+pub mod metadata_reader;
 pub mod reward;
 pub mod selection;
 pub mod selection_reader;
 pub mod stake;
+pub mod stake_reader;
 
 // use molecule::{bytes::Bytes, prelude::Entity};
 

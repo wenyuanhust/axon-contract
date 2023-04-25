@@ -191,7 +191,7 @@ dependencies = [
  "faster-hex",
  "lazy_static",
  "rand 0.7.3",
- "secp256k1",
+ "secp256k1 0.24.3",
  "thiserror",
 ]
 
@@ -389,6 +389,14 @@ dependencies = [
  "ckb-vm",
  "faster-hex",
  "serde",
+]
+
+[[package]]
+name = "ckb-smt"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "cty",
 ]
 
 [[package]]
@@ -1195,6 +1203,10 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
+version = "0.1.0"
+
+[[package]]
+name = "secp256k1"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b1629c9c557ef9b293568b338dddfc8208c98a18c59d722a9d53f859d9c9b62"
@@ -1268,6 +1280,17 @@ name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
+
+[[package]]
+name = "stake"
+version = "0.1.0"
+dependencies = [
+ "axon-types",
+ "ckb-smt",
+ "ckb-std",
+ "secp256k1 0.1.0",
+ "util",
+]
 
 [[package]]
 name = "static_assertions"
@@ -1381,7 +1404,9 @@ checksum = "e5464a87b239f13a63a501f2701565754bae92d243d4bb7eb12f6d57d2269bf4"
 name = "util"
 version = "0.1.0"
 dependencies = [
+ "axon-types",
  "blake2b-ref 0.3.1",
+ "ckb-smt",
  "ckb-std",
  "hex",
 ]
