@@ -18,7 +18,7 @@
         },
         {
           "name": "stake_addr",
-          "type": "Identity"
+          "type": "Byte65"
         }
       ]
     },
@@ -91,6 +91,10 @@
         {
           "name": "mode",
           "type": "byte"
+        },
+        {
+          "name": "eth_sig",
+          "type": "Bytes"
         }
       ]
     },

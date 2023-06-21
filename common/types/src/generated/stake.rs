@@ -30,20 +30,22 @@ impl ::core::default::Default for StakeArgs {
     fn default() -> Self {
         let v: Vec<u8> = vec![
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         StakeArgs::new_unchecked(v.into())
     }
 }
 impl StakeArgs {
-    pub const TOTAL_SIZE: usize = 52;
-    pub const FIELD_SIZES: [usize; 2] = [32, 20];
+    pub const TOTAL_SIZE: usize = 97;
+    pub const FIELD_SIZES: [usize; 2] = [32, 65];
     pub const FIELD_COUNT: usize = 2;
     pub fn metadata_type_id(&self) -> Byte32 {
         Byte32::new_unchecked(self.0.slice(0..32))
     }
-    pub fn stake_addr(&self) -> Identity {
-        Identity::new_unchecked(self.0.slice(32..52))
+    pub fn stake_addr(&self) -> Byte65 {
+        Byte65::new_unchecked(self.0.slice(32..97))
     }
     pub fn as_reader<'r>(&'r self) -> StakeArgsReader<'r> {
         StakeArgsReader::new_unchecked(self.as_slice())
@@ -101,14 +103,14 @@ impl<'r> ::core::fmt::Display for StakeArgsReader<'r> {
     }
 }
 impl<'r> StakeArgsReader<'r> {
-    pub const TOTAL_SIZE: usize = 52;
-    pub const FIELD_SIZES: [usize; 2] = [32, 20];
+    pub const TOTAL_SIZE: usize = 97;
+    pub const FIELD_SIZES: [usize; 2] = [32, 65];
     pub const FIELD_COUNT: usize = 2;
     pub fn metadata_type_id(&self) -> Byte32Reader<'r> {
         Byte32Reader::new_unchecked(&self.as_slice()[0..32])
     }
-    pub fn stake_addr(&self) -> IdentityReader<'r> {
-        IdentityReader::new_unchecked(&self.as_slice()[32..52])
+    pub fn stake_addr(&self) -> Byte65Reader<'r> {
+        Byte65Reader::new_unchecked(&self.as_slice()[32..97])
     }
 }
 impl<'r> molecule::prelude::Reader<'r> for StakeArgsReader<'r> {
@@ -135,17 +137,17 @@ impl<'r> molecule::prelude::Reader<'r> for StakeArgsReader<'r> {
 #[derive(Debug, Default)]
 pub struct StakeArgsBuilder {
     pub(crate) metadata_type_id: Byte32,
-    pub(crate) stake_addr: Identity,
+    pub(crate) stake_addr: Byte65,
 }
 impl StakeArgsBuilder {
-    pub const TOTAL_SIZE: usize = 52;
-    pub const FIELD_SIZES: [usize; 2] = [32, 20];
+    pub const TOTAL_SIZE: usize = 97;
+    pub const FIELD_SIZES: [usize; 2] = [32, 65];
     pub const FIELD_COUNT: usize = 2;
     pub fn metadata_type_id(mut self, v: Byte32) -> Self {
         self.metadata_type_id = v;
         self
     }
-    pub fn stake_addr(mut self, v: Identity) -> Self {
+    pub fn stake_addr(mut self, v: Byte65) -> Self {
         self.stake_addr = v;
         self
     }
@@ -1135,6 +1137,7 @@ impl ::core::fmt::Display for StakeAtWitness {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
         write!(f, "{} {{ ", Self::NAME)?;
         write!(f, "{}: {}", "mode", self.mode())?;
+        write!(f, ", {}: {}", "eth_sig", self.eth_sig())?;
         let extra_count = self.count_extra_fields();
         if extra_count != 0 {
             write!(f, ", .. ({} fields)", extra_count)?;
@@ -1144,12 +1147,12 @@ impl ::core::fmt::Display for StakeAtWitness {
 }
 impl ::core::default::Default for StakeAtWitness {
     fn default() -> Self {
-        let v: Vec<u8> = vec![9, 0, 0, 0, 8, 0, 0, 0, 0];
+        let v: Vec<u8> = vec![17, 0, 0, 0, 12, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0];
         StakeAtWitness::new_unchecked(v.into())
     }
 }
 impl StakeAtWitness {
-    pub const FIELD_COUNT: usize = 1;
+    pub const FIELD_COUNT: usize = 2;
     pub fn total_size(&self) -> usize {
         molecule::unpack_number(self.as_slice()) as usize
     }
@@ -1169,11 +1172,17 @@ impl StakeAtWitness {
     pub fn mode(&self) -> Byte {
         let slice = self.as_slice();
         let start = molecule::unpack_number(&slice[4..]) as usize;
+        let end = molecule::unpack_number(&slice[8..]) as usize;
+        Byte::new_unchecked(self.0.slice(start..end))
+    }
+    pub fn eth_sig(&self) -> Bytes {
+        let slice = self.as_slice();
+        let start = molecule::unpack_number(&slice[8..]) as usize;
         if self.has_extra_fields() {
-            let end = molecule::unpack_number(&slice[8..]) as usize;
-            Byte::new_unchecked(self.0.slice(start..end))
+            let end = molecule::unpack_number(&slice[12..]) as usize;
+            Bytes::new_unchecked(self.0.slice(start..end))
         } else {
-            Byte::new_unchecked(self.0.slice(start..))
+            Bytes::new_unchecked(self.0.slice(start..))
         }
     }
     pub fn as_reader<'r>(&'r self) -> StakeAtWitnessReader<'r> {
@@ -1202,7 +1211,9 @@ impl molecule::prelude::Entity for StakeAtWitness {
         ::core::default::Default::default()
     }
     fn as_builder(self) -> Self::Builder {
-        Self::new_builder().mode(self.mode())
+        Self::new_builder()
+            .mode(self.mode())
+            .eth_sig(self.eth_sig())
     }
 }
 #[derive(Clone, Copy)]
@@ -1225,6 +1236,7 @@ impl<'r> ::core::fmt::Display for StakeAtWitnessReader<'r> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
         write!(f, "{} {{ ", Self::NAME)?;
         write!(f, "{}: {}", "mode", self.mode())?;
+        write!(f, ", {}: {}", "eth_sig", self.eth_sig())?;
         let extra_count = self.count_extra_fields();
         if extra_count != 0 {
             write!(f, ", .. ({} fields)", extra_count)?;
@@ -1233,7 +1245,7 @@ impl<'r> ::core::fmt::Display for StakeAtWitnessReader<'r> {
     }
 }
 impl<'r> StakeAtWitnessReader<'r> {
-    pub const FIELD_COUNT: usize = 1;
+    pub const FIELD_COUNT: usize = 2;
     pub fn total_size(&self) -> usize {
         molecule::unpack_number(self.as_slice()) as usize
     }
@@ -1253,11 +1265,17 @@ impl<'r> StakeAtWitnessReader<'r> {
     pub fn mode(&self) -> ByteReader<'r> {
         let slice = self.as_slice();
         let start = molecule::unpack_number(&slice[4..]) as usize;
+        let end = molecule::unpack_number(&slice[8..]) as usize;
+        ByteReader::new_unchecked(&self.as_slice()[start..end])
+    }
+    pub fn eth_sig(&self) -> BytesReader<'r> {
+        let slice = self.as_slice();
+        let start = molecule::unpack_number(&slice[8..]) as usize;
         if self.has_extra_fields() {
-            let end = molecule::unpack_number(&slice[8..]) as usize;
-            ByteReader::new_unchecked(&self.as_slice()[start..end])
+            let end = molecule::unpack_number(&slice[12..]) as usize;
+            BytesReader::new_unchecked(&self.as_slice()[start..end])
         } else {
-            ByteReader::new_unchecked(&self.as_slice()[start..])
+            BytesReader::new_unchecked(&self.as_slice()[start..])
         }
     }
 }
@@ -1311,17 +1329,23 @@ impl<'r> molecule::prelude::Reader<'r> for StakeAtWitnessReader<'r> {
             return ve!(Self, OffsetsNotMatch);
         }
         ByteReader::verify(&slice[offsets[0]..offsets[1]], compatible)?;
+        BytesReader::verify(&slice[offsets[1]..offsets[2]], compatible)?;
         Ok(())
     }
 }
 #[derive(Debug, Default)]
 pub struct StakeAtWitnessBuilder {
     pub(crate) mode: Byte,
+    pub(crate) eth_sig: Bytes,
 }
 impl StakeAtWitnessBuilder {
-    pub const FIELD_COUNT: usize = 1;
+    pub const FIELD_COUNT: usize = 2;
     pub fn mode(mut self, v: Byte) -> Self {
         self.mode = v;
+        self
+    }
+    pub fn eth_sig(mut self, v: Bytes) -> Self {
+        self.eth_sig = v;
         self
     }
 }
@@ -1329,18 +1353,23 @@ impl molecule::prelude::Builder for StakeAtWitnessBuilder {
     type Entity = StakeAtWitness;
     const NAME: &'static str = "StakeAtWitnessBuilder";
     fn expected_length(&self) -> usize {
-        molecule::NUMBER_SIZE * (Self::FIELD_COUNT + 1) + self.mode.as_slice().len()
+        molecule::NUMBER_SIZE * (Self::FIELD_COUNT + 1)
+            + self.mode.as_slice().len()
+            + self.eth_sig.as_slice().len()
     }
     fn write<W: molecule::io::Write>(&self, writer: &mut W) -> molecule::io::Result<()> {
         let mut total_size = molecule::NUMBER_SIZE * (Self::FIELD_COUNT + 1);
         let mut offsets = Vec::with_capacity(Self::FIELD_COUNT);
         offsets.push(total_size);
         total_size += self.mode.as_slice().len();
+        offsets.push(total_size);
+        total_size += self.eth_sig.as_slice().len();
         writer.write_all(&molecule::pack_number(total_size as molecule::Number))?;
         for offset in offsets.into_iter() {
             writer.write_all(&molecule::pack_number(offset as molecule::Number))?;
         }
         writer.write_all(self.mode.as_slice())?;
+        writer.write_all(self.eth_sig.as_slice())?;
         Ok(())
     }
     fn build(&self) -> Self::Entity {

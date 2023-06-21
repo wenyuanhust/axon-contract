@@ -24,7 +24,7 @@ impl StakeArgs {
 
 impl StakeArgs {
     pub fn stake_addr(&self) -> Vec<u8> {
-        let cur = self.cursor.slice_by_offset(32, 20).unwrap();
+        let cur = self.cursor.slice_by_offset(32, 65).unwrap();
         cur.into()
     }
 }
@@ -150,6 +150,14 @@ impl StakeAtWitness {
     pub fn mode(&self) -> u8 {
         let cur = self.cursor.table_slice_by_index(0).unwrap();
         cur.into()
+    }
+}
+
+impl StakeAtWitness {
+    pub fn eth_sig(&self) -> Vec<u8> {
+        let cur = self.cursor.table_slice_by_index(1).unwrap();
+        let cur2 = cur.convert_to_rawbytes().unwrap();
+        cur2.into()
     }
 }
 

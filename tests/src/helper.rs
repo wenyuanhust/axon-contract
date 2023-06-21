@@ -50,6 +50,10 @@ pub fn axon_array32_byte32(bytes: [u8; 32]) -> basic::Byte32 {
     basic::Byte32::new_unchecked(bytes.to_vec().into())
 }
 
+pub fn axon_array65_byte65(bytes: [u8; 65]) -> basic::Byte65 {
+    basic::Byte65::new_unchecked(bytes.to_vec().into())
+}
+
 pub fn axon_byte20(bytes: &[u8; 20]) -> basic::Byte20 {
     basic::Byte20::new_unchecked(bytes.to_vec().into())
 }
@@ -341,6 +345,16 @@ pub fn sign_stake_tx(tx: TransactionView, key: &Privkey, witness: WitnessArgs) -
             .as_bytes()
             .pack(),
     );
+    println!("signed_witnesses: {:?}", signed_witnesses.len());
+    tx.as_advanced_builder()
+        .set_witnesses(signed_witnesses)
+        .build()
+}
+
+pub fn sign_eth_tx(tx: TransactionView, witness: WitnessArgs) -> TransactionView {
+    let mut signed_witnesses: Vec<packed::Bytes> = Vec::new();
+
+    signed_witnesses.push(witness.as_bytes().pack());
     println!("signed_witnesses: {:?}", signed_witnesses.len());
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)

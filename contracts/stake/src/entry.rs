@@ -1,6 +1,7 @@
 // Import from `core` instead of from `std` since we are in no-std mode
 use alloc::vec::Vec;
 use axon_types::metadata_reader;
+// use ophelia_secp256k1::Secp256k1Recoverable;
 // use ckb_std::ckb_types::packed::WitnessArgs;
 
 use core::result::Result;
@@ -11,7 +12,7 @@ use ckb_std::{
     ckb_constants::Source,
     ckb_types::{bytes::Bytes, prelude::*},
     debug,
-    high_level::{load_cell_lock_hash, load_script, load_witness_args},
+    high_level::{load_cell_lock_hash, load_script, load_tx_hash, load_witness_args},
 };
 
 use axon_types::{stake_reader, Cursor};
@@ -31,7 +32,7 @@ pub fn main() -> Result<(), Error> {
     let witness_args = load_witness_args(0, Source::GroupInput);
     match witness_args {
         Ok(witness) => {
-            let mode = {
+            let (mode, eth_sig) = {
                 let witness_lock = witness.lock().to_opt();
                 if witness_lock.is_none() {
                     return Err(Error::WitnessLockError);
@@ -42,8 +43,8 @@ pub fn main() -> Result<(), Error> {
                 );
                 let value: stake_reader::StakeAtWitness =
                     Cursor::from(witness_lock.unwrap().raw_data().to_vec()).into();
-                debug!("witness mode: {}", value.mode());
-                value.mode()
+                // debug!("witness mode: {}", value.mode());
+                (value.mode(), value.eth_sig())
             };
             debug!("stake at mode: {}", mode);
 
@@ -69,6 +70,7 @@ pub fn main() -> Result<(), Error> {
                     );
                     update_stake_at_cell(
                         &staker_identity,
+                        &eth_sig,
                         &stake_at_lock_hash,
                         &checkpoint_type_hash.to_vec(),
                         &type_ids.xudt_type_hash(),
@@ -94,6 +96,7 @@ pub fn main() -> Result<(), Error> {
 
 pub fn update_stake_at_cell(
     staker_identity: &Vec<u8>,
+    eth_sig: &Vec<u8>,
     stake_at_lock_hash: &[u8; 32],
     checkpoint_type_id: &Vec<u8>,
     xudt_type_hash: &Vec<u8>,
@@ -102,6 +105,12 @@ pub fn update_stake_at_cell(
     // if !secp256k1::verify_signature(&staker_identity) {
     //     return Err(Error::SignatureMismatch);
     // }
+    let tx_hash = load_tx_hash()?;
+    debug!("tx_hash:{:?}", tx_hash);
+    let msg = tx_hash.as_slice();
+    let eth_sig = eth_sig.as_slice();
+    let pubkey = staker_identity.as_slice();
+    // let result = Secp256k1Recoverable::verify_signature(&msg, &eth_sig, &pubkey);
 
     check_xudt_type_hash(xudt_type_hash)?;
 

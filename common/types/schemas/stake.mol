@@ -2,7 +2,7 @@ import basic;
 
 struct StakeArgs {
     metadata_type_id: Byte32,
-    stake_addr:       Identity,
+    stake_addr:       Byte65,
 }
 
 table StakeInfoDelta {
@@ -30,6 +30,7 @@ table StakeAtCellData {
 
 table StakeAtWitness {
     mode:          byte, // 0 is update stake at cell itself, 1 is update stake smt cell
+    eth_sig:       Bytes,// eth signature
 }
 
 table StakeSmtCellData {

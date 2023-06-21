@@ -1,8 +1,12 @@
-use std::convert::TryFrom;
+// use core::slice::SlicePattern;
+use std::convert::{TryFrom, TryInto};
 
-use ophelia::{Crypto, PrivateKey, Signature, ToPublicKey, UncompressedPublicKey};
+use ckb_testtool::{ckb_crypto::secp::Generator, ckb_types::H256};
+use ophelia::{Crypto, PrivateKey, PublicKey, Signature, ToPublicKey, UncompressedPublicKey};
 // use ophelia_secp256k1::Secp256k1PrivateKey;
-use ophelia_secp256k1::{Secp256k1Recoverable, Secp256k1RecoverablePrivateKey};
+use ophelia_secp256k1::{
+    Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Secp256k1RecoverablePublicKey,
+};
 
 // pub fn hex_decode(src: &str) -> Vec<u8> {
 //     if src.is_empty() {
@@ -29,6 +33,40 @@ use ophelia_secp256k1::{Secp256k1Recoverable, Secp256k1RecoverablePrivateKey};
 // }
 
 #[test]
+fn test_eth_ckb_success() {
+    // let msg = [0u8; 32];
+    // let keypair = Generator::random_keypair();
+    // // let priv_key = H256::from(keypair.0.pubkey());
+    // let priv_key: H256 = keypair.0.into();
+    // let priv_key = keypair.0.inner;
+    // // let priv_key: [u8; 32] = priv_key.to_vec().try_into().unwrap();
+    // let priv_key = Secp256k1RecoverablePrivateKey::try_from(priv_key).unwrap();
+    // let signature = Secp256k1Recoverable::sign_message(&msg, &priv_key.to_bytes())
+    //     .unwrap()
+    //     .to_bytes();
+
+    // let pubkey = Secp256k1RecoverablePublicKey::try_from(keypair.1.serialize().as_slice()).unwrap();
+    // let pubkey = pubkey.to_uncompressed_bytes();
+
+    // {
+    //     let result = Secp256k1Recoverable::verify_signature(&msg, &signature, &pubkey);
+    //     match result {
+    //         Ok(_) => println!("Verify secp256k1 signature success!"),
+    //         Err(err) => println!("Verify secp256k1 signature failed! {}", err),
+    //     }
+    // }
+
+    // {
+    //     let msg = [1u8; 32];
+    //     let result = Secp256k1Recoverable::verify_signature(&msg, &signature, &pubkey);
+    //     match result {
+    //         Ok(_) => println!("Verify secp256k1 signature success!"),
+    //         Err(err) => println!("Verify secp256k1 signature failed! {}", err),
+    //     }
+    // }
+}
+
+#[test]
 fn test_eth_success() {
     {
         let msg = [0u8; 32];
@@ -40,7 +78,30 @@ fn test_eth_success() {
             .to_bytes();
 
         let pubkey = priv_key.pub_key();
+        {
+            let key = pubkey.to_bytes();
+            println!("pub_key, {}", key.len());
+            // let key = key.
+        }
         let pubkey = pubkey.to_uncompressed_bytes();
+        println!("pub_key, {}", pubkey.len());
+
+        {
+            let result = Secp256k1Recoverable::verify_signature(&msg, &signature, &pubkey);
+            match result {
+                Ok(_) => println!("Verify secp256k1 signature success!"),
+                Err(err) => println!("Verify secp256k1 signature failed! {}", err),
+            }
+        }
+
+        {
+            let msg = [1u8; 32];
+            let result = Secp256k1Recoverable::verify_signature(&msg, &signature, &pubkey);
+            match result {
+                Ok(_) => println!("Verify secp256k1 signature success!"),
+                Err(err) => println!("Verify secp256k1 signature failed! {}", err),
+            }
+        }
 
         {
             let result = Secp256k1Recoverable::verify_signature(&msg, &signature, &pubkey);

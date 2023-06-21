@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::convert::{TryFrom, TryInto};
 // use std::convert::TryInto;
 
 use crate::smt::{construct_epoch_smt, construct_lock_info_smt, u64_to_h256, TopSmtInfo};
@@ -14,6 +15,10 @@ use ckb_testtool::ckb_types::{bytes::Bytes, core::TransactionBuilder, packed::*,
 use ckb_testtool::{builtin::ALWAYS_SUCCESS, context::Context};
 use helper::*;
 use molecule::prelude::*;
+use ophelia::{Crypto, PrivateKey, Signature, ToPublicKey, UncompressedPublicKey};
+use ophelia_secp256k1::{
+    Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Secp256k1RecoverableSignature,
+};
 use util::smt::{new_blake2b, LockInfo, BOTTOM_SMT};
 
 #[test]
@@ -62,11 +67,19 @@ fn test_stake_at_increase_success() {
         .out_point(always_success_out_point.clone())
         .build();
 
+    // eth signature
+    let hex_privkey = [0xcd; 32];
+    let priv_key = Secp256k1RecoverablePrivateKey::try_from(hex_privkey.as_slice()).unwrap();
+    let pubkey = priv_key.pub_key();
+    let pubkey = pubkey.to_uncompressed_bytes();
+    println!("pubkey len: {:?}", pubkey.len());
+    let pubkey: [u8; 65] = pubkey.to_vec().try_into().unwrap();
+
     // prepare stake_args and stake_data
     let keypair = Generator::random_keypair();
     let stake_args = stake::StakeArgs::new_builder()
         .metadata_type_id(axon_byte32(&metadata_type_script.calc_script_hash()))
-        .stake_addr(axon_identity(&keypair.1.serialize()))
+        .stake_addr(axon_array65_byte65(pubkey))
         .build();
 
     let input_stake_info_delta = stake::StakeInfoDelta::new_builder()
@@ -192,28 +205,38 @@ fn test_stake_at_increase_success() {
         )
         .build();
 
-    let stake_at_witness = StakeAtWitness::new_builder().mode(0.into()).build();
-    println!("stake at witness: {:?}", stake_at_witness.as_bytes().len());
-    let stake_at_witness = WitnessArgs::new_builder()
-        .lock(Some(Bytes::from(stake_at_witness.as_bytes())).pack())
-        .build();
-
     // prepare signed tx
     let tx = TransactionBuilder::default()
         .inputs(inputs)
         .outputs(outputs)
         .outputs_data(outputs_data.pack())
-        .witness(stake_at_witness.as_bytes().pack())
+        // .witness(stake_at_witness.as_bytes().pack())
         .cell_dep(contract_dep)
         .cell_dep(always_success_script_dep)
         .cell_dep(secp256k1_data_dep)
         .cell_dep(checkpoint_script_dep)
         .cell_dep(metadata_script_dep)
         .build();
+
+    let msg = tx.hash();
+    println!("tx hash: {:?}", msg.clone().as_bytes().to_vec());
+    let signature = Secp256k1Recoverable::sign_message(&msg.as_bytes(), &priv_key.to_bytes())
+        .unwrap()
+        .to_bytes()
+        .to_vec();
+    let stake_at_witness = StakeAtWitness::new_builder()
+        .mode(0.into())
+        .eth_sig(axon_bytes(&signature))
+        .build();
+    println!("stake at witness: {:?}", stake_at_witness.as_bytes().len());
+    let stake_at_witness = WitnessArgs::new_builder()
+        .lock(Some(Bytes::from(stake_at_witness.as_bytes())).pack())
+        .build();
+
     let tx = context.complete_tx(tx);
 
     // sign tx for stake at cell (update stake at cell delta mode)
-    // let tx = sign_stake_tx(tx, &keypair.0, stake_at_witness);
+    let tx = sign_eth_tx(tx, stake_at_witness);
 
     // run
     let cycles = context
@@ -299,7 +322,8 @@ fn test_stake_smt_success() {
     let keypair = Generator::random_keypair();
     let stake_at_args = stake::StakeArgs::new_builder()
         .metadata_type_id(axon_byte32(&metadata_type_script.calc_script_hash()))
-        .stake_addr(axon_identity(&keypair.1.serialize()))
+        // .stake_addr(axon_identity(&keypair.1.serialize()))
+        .stake_addr(axon_array65_byte65([0u8; 65]))
         .build();
 
     let input_stake_info_delta = stake::StakeInfoDelta::new_builder()
