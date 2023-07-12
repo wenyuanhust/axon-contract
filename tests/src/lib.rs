@@ -8,6 +8,7 @@ use std::str::FromStr;
 mod checkpoint;
 mod delegate;
 mod eth;
+mod eth_signature;
 mod helper;
 mod metadata;
 mod reward;

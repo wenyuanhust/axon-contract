@@ -21,6 +21,7 @@ use ckb_testtool::{
 };
 use molecule::prelude::*;
 use sparse_merkle_tree::CompiledMerkleProof;
+use tiny_keccak::{Hasher, Keccak};
 use util::smt::{u64_to_h256, LockInfo, TOP_SMT};
 
 use crate::smt::{construct_epoch_smt, construct_lock_info_smt, TopSmtInfo};
@@ -53,6 +54,14 @@ pub fn axon_byte32(bytes: &Byte32) -> basic::Byte32 {
 
 pub fn axon_array32_byte32(bytes: [u8; 32]) -> basic::Byte32 {
     basic::Byte32::new_unchecked(bytes.to_vec().into())
+}
+
+pub fn axon_byte65(bytes: Vec<u8>) -> basic::Byte65 {
+    basic::Byte65::new_unchecked(bytes.into())
+}
+
+pub fn axon_array65_byte65(bytes: [u8; 65]) -> basic::Byte65 {
+    basic::Byte65::new_unchecked(bytes.to_vec().into())
 }
 
 pub fn axon_byte20(bytes: &[u8; 20]) -> basic::Byte20 {
@@ -130,6 +139,18 @@ pub fn axon_identity_opt(pubkey: &Vec<u8>) -> basic::IdentityOpt {
 
 pub fn axon_identity_none() -> basic::IdentityOpt {
     basic::IdentityOpt::new_builder().set(None).build()
+}
+
+pub fn eth_addr(pubkey: Vec<u8>) -> basic::Identity {
+    let mut keccak = Keccak::v256();
+    let input = pubkey.as_slice();
+    println!("input:{:?}", input);
+    keccak.update(input);
+    let mut output = [0; 32];
+    keccak.finalize(&mut output);
+    let pubkey_hash = output[12..].to_vec();
+
+    axon_identity(&pubkey_hash)
 }
 
 // construct stake_at cell data based on version, l1_address, l2_address, metadata_type_id, delta
@@ -432,6 +453,16 @@ pub fn sign_stake_tx(tx: TransactionView, key: &Privkey, witness: WitnessArgs) -
             .as_bytes()
             .pack(),
     );
+    println!("signed_witnesses: {:?}", signed_witnesses.len());
+    tx.as_advanced_builder()
+        .set_witnesses(signed_witnesses)
+        .build()
+}
+
+pub fn sign_eth_tx(tx: TransactionView, witness: WitnessArgs) -> TransactionView {
+    let mut signed_witnesses: Vec<packed::Bytes> = Vec::new();
+
+    signed_witnesses.push(witness.as_bytes().pack());
     println!("signed_witnesses: {:?}", signed_witnesses.len());
     tx.as_advanced_builder()
         .set_witnesses(signed_witnesses)

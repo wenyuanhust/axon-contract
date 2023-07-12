@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::convert::{TryFrom, TryInto};
 // use std::convert::TryInto;
 
 use crate::smt::{construct_epoch_smt, construct_lock_info_smt, TopSmtInfo};
@@ -14,6 +15,8 @@ use ckb_testtool::ckb_types::{bytes::Bytes, core::TransactionBuilder, packed::*,
 use ckb_testtool::{builtin::ALWAYS_SUCCESS, context::Context};
 use helper::*;
 use molecule::prelude::*;
+use ophelia::{Crypto, PrivateKey, Signature, ToPublicKey, UncompressedPublicKey};
+use ophelia_secp256k1::{Secp256k1Recoverable, Secp256k1RecoverablePrivateKey};
 use util::smt::u64_to_h256;
 use util::smt::{new_blake2b, LockInfo, BOTTOM_SMT};
 
@@ -21,8 +24,21 @@ use util::smt::{new_blake2b, LockInfo, BOTTOM_SMT};
 fn test_stake_at_increase_success() {
     // init context
     let mut context = Context::default();
-    let secp256k1_data_bin = BUNDLED_CELL.get("specs/cells/secp256k1_data").unwrap();
-    let secp256k1_data_out_point = context.deploy_cell(secp256k1_data_bin.to_vec().into());
+    let secp256k1_data_bin: Bytes = fs::read(
+        "/root/git/axon-contract/common/ckb-lib-secp256k1/secp256k1_blake2b_sighash_all_dual",
+    )
+    .expect("load secp256k1")
+    .into();
+    let secp256k1_data_out_point = context.deploy_cell(secp256k1_data_bin);
+    let secp256k1_script = context.build_script_with_hash_type(
+        &secp256k1_data_out_point,
+        ScriptHashType::Data1,
+        Bytes::from(vec![2]),
+    );
+    println!(
+        "secp256k1 code hash: {:?}",
+        secp256k1_script.unwrap().code_hash().as_slice()
+    );
     let secp256k1_data_dep = CellDep::new_builder()
         .out_point(secp256k1_data_out_point)
         .build();
@@ -63,11 +79,21 @@ fn test_stake_at_increase_success() {
         .out_point(always_success_out_point.clone())
         .build();
 
+    // eth signature
+    let hex_privkey = [0xcd; 32];
+    let priv_key = Secp256k1RecoverablePrivateKey::try_from(hex_privkey.as_slice()).unwrap();
+    let pubkey = priv_key.pub_key();
+    let pubkey = pubkey.to_uncompressed_bytes();
+    println!("pubkey len: {:?}", pubkey.len());
+    let pubkey: [u8; 65] = pubkey.to_vec().try_into().unwrap();
+
     // prepare stake_args and stake_data
     let keypair = Generator::random_keypair();
+    println!("pubkey: {:?}", keypair.1.serialize());
     let stake_args = stake::StakeArgs::new_builder()
         .metadata_type_id(axon_byte32(&metadata_type_script.calc_script_hash()))
-        .stake_addr(axon_identity(&keypair.1.serialize()))
+        // .stake_addr(eth_addr(&keypair.1.serialize()))
+        .stake_addr(eth_addr(pubkey.to_vec()))
         .build();
 
     let input_stake_info_delta = stake::StakeInfoDelta::new_builder()
@@ -193,25 +219,60 @@ fn test_stake_at_increase_success() {
         )
         .build();
 
-    let stake_at_witness = StakeAtWitness::new_builder().mode(0.into()).build();
-    println!("stake at witness: {:?}", stake_at_witness.as_bytes().len());
-    let stake_at_witness = WitnessArgs::new_builder()
-        .lock(Some(Bytes::from(stake_at_witness.as_bytes())).pack())
-        .build();
+    // let stake_at_witness = StakeAtWitness::new_builder().mode(0.into()).build();
+    // println!("stake at witness: {:?}", stake_at_witness.as_bytes().len());
+    // let stake_at_witness = WitnessArgs::new_builder()
+    //     .lock(Some(Bytes::from(stake_at_witness.as_bytes())).pack())
+    //     .build();
 
     // prepare signed tx
     let tx = TransactionBuilder::default()
         .inputs(inputs)
         .outputs(outputs)
         .outputs_data(outputs_data.pack())
-        .witness(stake_at_witness.as_bytes().pack())
+        // .witness(stake_at_witness.as_bytes().pack())
         .cell_dep(contract_dep)
         .cell_dep(always_success_script_dep)
         .cell_dep(secp256k1_data_dep)
         .cell_dep(checkpoint_script_dep)
         .cell_dep(metadata_script_dep)
         .build();
+
+    let msg = tx.hash();
+    println!("tx hash: {:?}", msg.clone().as_bytes().to_vec());
+    let signature = Secp256k1Recoverable::sign_message(&msg.as_bytes(), &priv_key.to_bytes())
+        .unwrap()
+        .to_bytes()
+        .to_vec();
+    println!("signature:{:?}, len: {:?}", signature, signature.len());
+
+    {
+        let pubkey: ophelia_secp256k1::Secp256k1RecoverablePublicKey = priv_key.pub_key();
+        let pubkey = pubkey.to_uncompressed_bytes();
+        let result = Secp256k1Recoverable::verify_signature(&msg.as_slice(), &signature, &pubkey);
+        println!(
+            "secp256k1 signature, signature: {:?}, msg: {:?}, pubkey: {:?}",
+            signature,
+            msg.as_slice().to_vec(),
+            pubkey.to_vec()
+        );
+        match result {
+            Ok(_) => println!("Verify secp256k1 signature success!"),
+            Err(err) => println!("Verify secp256k1 signature failed! {}", err),
+        }
+    }
+
+    let stake_at_witness = StakeAtWitness::new_builder()
+        .mode(0.into())
+        .eth_sig(axon_byte65(signature))
+        .build();
+    println!("stake at witness: {:?}", stake_at_witness.as_bytes().len());
+    let stake_at_witness = WitnessArgs::new_builder()
+        .lock(Some(Bytes::from(stake_at_witness.as_bytes())).pack())
+        .build();
+
     let tx = context.complete_tx(tx);
+    let tx = sign_eth_tx(tx, stake_at_witness);
 
     // sign tx for stake at cell (update stake at cell delta mode)
     // let tx = sign_stake_tx(tx, &keypair.0, stake_at_witness);
