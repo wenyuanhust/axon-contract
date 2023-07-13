@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use axon_types::metadata_reader;
 use tiny_keccak::{Hasher, Keccak};
 // use ckb_std::ckb_types::packed::WitnessArgs;
-use ckb_lib_secp256k1::LibCKBSecp256k1;
+// use ckb_lib_secp256k1::LibCKBSecp256k1;
 use ckb_std::dynamic_loading_c_impl::CKBDLContext;
 
 use core::result::Result;
@@ -222,7 +222,8 @@ pub fn update_stake_at_cell(
 
     let mut context = unsafe { CKBDLContext::<[u8; 128 * 1024]>::new() };
     debug!("LibCKBSecp256k1: load secp256k1");
-    let secp256k1 = LibCKBSecp256k1::load(&mut context);
+    // let secp256k1: LibCKBSecp256k1 = LibCKBSecp256k1::load(&mut context);
+    // let secp256k1: LibCKBSecp256k1 = unreachable!();
     debug!(
         "verify_signature eth_sig: {:?}, msg: {:?}, msg len: {:?}, pubkey: {:?}",
         eth_sig,
@@ -230,8 +231,9 @@ pub fn update_stake_at_cell(
         msg.len(),
         staker_identity
     );
-    let result = secp256k1.verify_signature(&eth_sig, &msg);
-    let pubkey = result.unwrap();
+    // let result = secp256k1.verify_signature(&eth_sig, &msg);
+    // let pubkey = result.unwrap();
+    let pubkey = [];
 
     // let pubkey = [0u8; 32];
     let mut keccak = Keccak::v256();
