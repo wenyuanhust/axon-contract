@@ -1,0 +1,11 @@
+[package]
+name = "ckb-lib-secp256k1"
+version = "0.1.0"
+authors = ["dylan <duanyytop@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+ckb-std = "0.13.0"
+
+[build-dependencies]
+blake2b-rs = "0.2.0"
