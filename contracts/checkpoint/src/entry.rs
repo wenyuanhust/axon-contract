@@ -164,7 +164,9 @@ fn verify_multsig(
         .append(&round)
         .append(&2u8)
         .append(&block_hash);
+    debug!("-------message: {:?}", message.as_raw().to_vec());
     let signature: Vec<u8> = proof_rlp.val_at(3).map_err(|_| Error::ProofRlpError)?;
+    debug!("-------signature: {:?}", signature);
     if signature.len() != 96 {
         return Err(Error::ProofRlpError);
     }
@@ -174,6 +176,7 @@ fn verify_multsig(
         .filter_map(|(i, flag)| {
             if flag {
                 if let Some(pub_key) = bls_pub_keys.get(i) {
+                    debug!("------active key: {:?}", pub_key);
                     return Some(Ok(*pub_key));
                 } else {
                     return Some(Err(Error::ProofRlpError));
