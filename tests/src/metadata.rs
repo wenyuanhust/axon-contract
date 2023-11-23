@@ -11,19 +11,254 @@ use axon_types::checkpoint::{CheckpointCellData, ProposeCount, ProposeCounts};
 use axon_types::metadata::{
     DelegateInfo, DelegateProof, DelegateProofs, ElectionSmtProof, Metadata, MetadataArgs,
     MetadataList, MetadataWitness, MinerGroupInfo, MinerGroupInfos, StakeSmtElectionInfo,
+    Validator, ValidatorList,
 };
+use axon_types::metadata_reader::MetadataCellData;
 use axon_types::withdraw::WithdrawArgs;
+use axon_types::Cursor;
 use ckb_testtool::ckb_crypto::secp::{Generator, Privkey, Pubkey};
 use ckb_testtool::ckb_types::core::ScriptHashType;
+use ckb_testtool::ckb_types::{self, h256};
 use ckb_testtool::ckb_types::{
     bytes::Bytes, core::TransactionBuilder, core::TransactionView, packed::*, prelude::*,
 };
 use ckb_testtool::{builtin::ALWAYS_SUCCESS, context::Context};
+
+use ckb_sdk::{
+    constants::SIGHASH_TYPE_HASH,
+    traits::{
+        default_impls::{
+            DefaultCellCollector, DefaultCellDepResolver, DefaultHeaderDepResolver,
+            DefaultTransactionDependencyProvider,
+        },
+        CellCollector, CellQueryOptions, Signer,
+    },
+};
+
 use helper::*;
 use molecule::prelude::*;
 use util::error::Error::MetadataNotLastCheckpoint;
-use util::helper::ProposeCountObject;
+use util::helper::{bytes_to_u128, ProposeCountObject};
 use util::smt::{u64_to_h256, LockInfo};
+
+#[test]
+fn test_calc_type_id() {
+    let tx_hash = h256!("0xf2039e169030e4f3ed5ea860fe34926d35b1129f66c2d5bd26bf50b86cea879e");
+    let previous_output = OutPoint::new(tx_hash.pack(), 0);
+    let input = CellInput::new_builder()
+        .previous_output(previous_output)
+        .build();
+
+    let new_metadata_type_id = calc_type_id(&input, 0);
+    println!("new_metadata_type_id: {:#x}", new_metadata_type_id);
+}
+
+#[test]
+fn test_metadata_parse() {
+    let ckb_rpc = "https://testnet.ckb.dev/rpc";
+    let mut cell_collector = DefaultCellCollector::new(ckb_rpc);
+
+    // Define the type script
+    let code_hash = Byte32::from_slice(
+        &hex::decode("2c8f63ac17c1e5e660dddbf49e88994cd1c49d4d6e99e7a7fd3f8879700d3cd1").unwrap(),
+    )
+    .unwrap();
+    let hash_type = ckb_types::core::ScriptHashType::Type.into();
+    let args =
+        hex::decode("db0782aba62896c2a7c279f3de8dbbd7fd06729cc8b7b499df93f5c450f61839").unwrap();
+    println!("args len: {:x?}", args);
+    let metadata_cell_type_script = ckb_types::packed::Script::new_builder()
+        .code_hash(code_hash)
+        .hash_type(hash_type)
+        .args(Bytes::from(args).pack())
+        .build();
+
+    let query = CellQueryOptions::new_type(metadata_cell_type_script);
+    let (more_infos, more_capacity) = cell_collector.collect_live_cells(&query, true).unwrap();
+    println!("cell: {}, cap: {}", more_infos.len(), more_capacity);
+
+    let cell_data = more_infos[0].output_data.clone();
+    let metadata: Option<MetadataCellData> = Some(Cursor::from(cell_data[..].to_vec()).into());
+    match metadata {
+        Some(metadata) => {
+            let base_reward = metadata.base_reward();
+            // let base_reward = Cursor::from(base_reward).into();
+            println!("base reward: {:?}", bytes_to_u128(&base_reward));
+            let propose_minimum_rate = metadata.propose_minimum_rate();
+            println!("propose_minimum_rate: {}", propose_minimum_rate);
+            let metadatalist = metadata.metadata();
+            let metadata0 = metadatalist.get(0);
+            let validatorlist = metadata0.validators();
+            println!("validatorlist len {}", validatorlist.len());
+            let validator = validatorlist.get(0);
+            let bls_pub_key = validator.bls_pub_key();
+            println!("bls_pub_key: {:x?}", bls_pub_key);
+        }
+        None => println!("fail"),
+    }
+}
+
+#[test]
+fn test_metadata_cell_data() {
+    let validator_list = get_validator_list();
+    let metadata0 = Metadata::new_builder()
+        .epoch_len(axon_u32(100))
+        .quorum(axon_u16(2))
+        .validators(validator_list)
+        .build();
+    let metadata1 = metadata0.clone();
+    let metadata_list = MetadataList::new_builder()
+        .push(metadata0)
+        .push(metadata1)
+        .build();
+
+    let metadata_type_script = Script::new_builder().build();
+    let output_meta_data = axon_metadata_data_by_script(
+        &metadata_type_script.clone(),
+        &metadata_type_script.calc_script_hash(),
+        &metadata_type_script,
+        &metadata_type_script,
+        &metadata_type_script,
+        metadata_list,
+        2,
+        100,
+        100,
+        [0u8; 32],
+        &metadata_type_script.code_hash(),
+        &metadata_type_script.code_hash(),
+        &metadata_type_script.code_hash(),
+    );
+
+    println!("output_data: {:?}", output_meta_data);
+    // let output_data = output_meta_data.as_slice();
+    // let output_data: String = output_data
+    //     .iter()
+    //     .map(|byte| format!("{:02x}", byte))
+    //     .collect();
+    // println!("output_data: 0x{}", output_data);
+}
+
+pub fn hex_decode(src: &str) -> Vec<u8> {
+    if src.is_empty() {
+        return Vec::new();
+    }
+
+    let src = if src.starts_with("0x") {
+        src.split_at(2).1
+    } else {
+        src
+    };
+
+    let src = src.as_bytes();
+    let mut ret = vec![0u8; src.len() / 2];
+    faster_hex::hex_decode(src, &mut ret).unwrap();
+
+    ret
+}
+/*
+[[params.verifier_list]]
+bls_pub_key = "0xa26e3fe1cf51bd4822072c61bdc315ac32e3d3c2e2484bb92942666399e863b4bf56cf2926383cc706ffc15dfebc85c6"
+pub_key = "0x031ddc35212b7fc7ff6685b17d91f77c972535aee5c7ae5684d3e72b986f08834b"
+address = "0x8ab0cf264df99d83525e9e11c7e4db01558ae1b1"
+propose_weight = 1
+vote_weight = 1
+
+[[params.verifier_list]]
+bls_pub_key = "0x80310fa9df724b5603d283b472ed3bf85254a8a4ceda8a274b421f6cf2be1d9184267cdfe9a199d36ff14e57668a55d0"
+pub_key = "0x02b77c74eb68af3d4d6cc7884ed6709f1a2a1af0f713382a4438ec2ea3a70d4d7f"
+address = "0xf386573563c3a75dbbd269fce9782620826ddac2"
+propose_weight = 1
+vote_weight = 1
+
+[[params.verifier_list]]
+bls_pub_key = "0x897721e9016864141a8b982a48217f66ef318ce598aa31842cddaaebe3cd7feab17050022afa6c2123aba39938fe4142"
+pub_key = "0x027ffd6a6a231561f2afe5878b1c743323b34263d16787130b1815fe35649b0bf5"
+address = "0x8af204ac5d7cb8815a6c53a50b72d01e729d3b22"
+propose_weight = 1
+vote_weight = 1
+
+[[params.verifier_list]]
+bls_pub_key = "0x98eef09a3927acb225191101a1d9aa85775fdcdc87b9ba36898f6c132b485d66aef91c0f51cda331be4f985c3be6761c"
+pub_key = "0x0232c489c23b1207107e9a24648c1e4754a8c1c0b38db96df57a526201035058cb"
+address = "0xf4cc1652dcec2e5de9ce6fb1b6f9fa9456e957f1"
+propose_weight = 1
+vote_weight = 1
+ */
+pub fn get_validator_list() -> ValidatorList {
+    let mut valiators = Vec::new();
+    {
+        let bls_pub_key: [u8; 48] = hex_decode("0xa26e3fe1cf51bd4822072c61bdc315ac32e3d3c2e2484bb92942666399e863b4bf56cf2926383cc706ffc15dfebc85c6").try_into().unwrap();
+        let pub_key =
+            hex_decode("0x031ddc35212b7fc7ff6685b17d91f77c972535aee5c7ae5684d3e72b986f08834b");
+        let address: [u8; 20] = hex_decode("0x8ab0cf264df99d83525e9e11c7e4db01558ae1b1")
+            .try_into()
+            .unwrap();
+        println!("bls: {:x?}, {}", bls_pub_key, bls_pub_key.len(),);
+
+        let validator0 = Validator::new_builder()
+            .bls_pub_key(axon_array48_byte48([0u8; 48]))
+            .pub_key(axon_byte33(pub_key))
+            .address(axon_byte20_identity(&address))
+            .build();
+
+        valiators.push(validator0);
+    }
+    {
+        let bls_pub_key: [u8; 48] = hex_decode("0x80310fa9df724b5603d283b472ed3bf85254a8a4ceda8a274b421f6cf2be1d9184267cdfe9a199d36ff14e57668a55d0").try_into().unwrap();
+        let pub_key =
+            hex_decode("0x02b77c74eb68af3d4d6cc7884ed6709f1a2a1af0f713382a4438ec2ea3a70d4d7f");
+        let address: [u8; 20] = hex_decode("0xf386573563c3a75dbbd269fce9782620826ddac2")
+            .try_into()
+            .unwrap();
+        println!("bls: {:x?}, {}", bls_pub_key, bls_pub_key.len(),);
+
+        let validator1 = Validator::new_builder()
+            .bls_pub_key(axon_array48_byte48([0u8; 48]))
+            .pub_key(axon_byte33(pub_key))
+            .address(axon_byte20_identity(&address))
+            .build();
+
+        valiators.push(validator1);
+    }
+    {
+        let bls_pub_key: [u8; 48] = hex_decode("0x897721e9016864141a8b982a48217f66ef318ce598aa31842cddaaebe3cd7feab17050022afa6c2123aba39938fe4142").try_into().unwrap();
+        let pub_key =
+            hex_decode("0x027ffd6a6a231561f2afe5878b1c743323b34263d16787130b1815fe35649b0bf5");
+        let address: [u8; 20] = hex_decode("0x8af204ac5d7cb8815a6c53a50b72d01e729d3b22")
+            .try_into()
+            .unwrap();
+        println!("bls: {:x?}, {}", bls_pub_key, bls_pub_key.len(),);
+
+        let validator2 = Validator::new_builder()
+            .bls_pub_key(axon_array48_byte48([0u8; 48]))
+            .pub_key(axon_byte33(pub_key))
+            .address(axon_byte20_identity(&address))
+            .build();
+
+        valiators.push(validator2);
+    }
+    {
+        let bls_pub_key: [u8; 48] = hex_decode("0x98eef09a3927acb225191101a1d9aa85775fdcdc87b9ba36898f6c132b485d66aef91c0f51cda331be4f985c3be6761c").try_into().unwrap();
+        let pub_key =
+            hex_decode("0x0232c489c23b1207107e9a24648c1e4754a8c1c0b38db96df57a526201035058cb");
+        let address: [u8; 20] = hex_decode("0xf4cc1652dcec2e5de9ce6fb1b6f9fa9456e957f1")
+            .try_into()
+            .unwrap();
+        println!("bls: {:x?}, {}", bls_pub_key, bls_pub_key.len(),);
+
+        let validator3 = Validator::new_builder()
+            .bls_pub_key(axon_array48_byte48([0u8; 48]))
+            .pub_key(axon_byte33(pub_key))
+            .address(axon_byte20_identity(&address))
+            .build();
+
+        valiators.push(validator3);
+    }
+
+    let validator_list = ValidatorList::new_builder().set(valiators).build();
+
+    validator_list
+}
 
 #[test]
 fn test_metadata_creation_success() {

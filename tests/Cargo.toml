@@ -24,3 +24,4 @@ ophelia-secp256k1 = "0.3"
 faster-hex = "0.6"
 rand_core = "0.6.4"
 secp256k1-utils = { path = "../common/secp256k1-utils" }
+ckb-sdk = "2.5.0"
